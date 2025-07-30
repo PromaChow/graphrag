@@ -1,29 +1,51 @@
 name: Close inactive issues
 on:
-  schedule:
-    - cron: "30 1 * * *"
+  push:
+    branches:
+      - main
 
+jobs:
+  close-issues:
+    permissions:
+      issues: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start Energy Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: start-measurement
+      - uses: actions/stale@v9
+        with:
+          any-of-labels: awaiting_response
+          close-issue-label: autoresolved
+          close-issue-message: This issue has been closed after being marked as stale
+            for five days. Please reopen if needed.
+          days-before-issue-close: 5
+          days-before-issue-stale: 7
+          days-before-pr-close: -1
+          days-before-pr-stale: -1
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          stale-issue-label: stale
+          stale-issue-message: This issue has been marked stale due to inactivity
+            after repo maintainer or community member responses that request more
+            information or suggest a solution. It will be closed after five additional
+            days.
+      - id: display-measurement
+        name: Display Energy Results
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: display-results
+      - name: Save Total Energy Consumption Data
+        run: echo '${{ steps.final-measurement.outputs.data-total-json }}' > total_energy_consumption.json
+      - name: Upload Energy Consumption Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: total-energy-consumption
+          path: total_energy_consumption.json
 permissions:
   actions: write
   issues: write
   pull-requests: write
-
-jobs:
-  close-issues:
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-      pull-requests: write
-    steps:
-      - uses: actions/stale@v9
-        with:
-          days-before-issue-stale: 7
-          days-before-issue-close: 5
-          stale-issue-label: "stale"
-          close-issue-label: "autoresolved"
-          stale-issue-message: "This issue has been marked stale due to inactivity after repo maintainer or community member responses that request more information or suggest a solution. It will be closed after five additional days."
-          close-issue-message: "This issue has been closed after being marked as stale for five days. Please reopen if needed."
-          any-of-labels: "awaiting_response"
-          days-before-pr-stale: -1
-          days-before-pr-close: -1
-          repo-token: ${{ secrets.GITHUB_TOKEN }}

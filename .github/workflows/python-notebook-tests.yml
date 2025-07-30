@@ -2,82 +2,90 @@ name: Python Notebook Tests
 on:
   push:
     branches:
-      - "**/main" # match branches like feature/main
-      - "main"    # match the main branch
-  pull_request:
-    types:
-      - opened
-      - reopened
-      - synchronize
-      - ready_for_review
-    branches:
-      - "**/main"
-      - "main"
-    paths-ignore:
-      - "**/*.md"
-      - ".semversioner/**"
-
-permissions:
-  contents: read
-  pull-requests: read
+      - main
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  # Only run the for the latest commit
   cancel-in-progress: true
-
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref}}
 env:
   POETRY_VERSION: 1.8.3
-
 jobs:
   python-ci:
-    # skip draft PRs
-    if: github.event.pull_request.draft == false
-    strategy:
-      matrix:
-        python-version: ["3.10"]
-        os: [ubuntu-latest, windows-latest]
-      fail-fast: false # Continue running all jobs even if one fails
     env:
       DEBUG: 1
       GRAPHRAG_API_KEY: ${{ secrets.OPENAI_NOTEBOOK_KEY }}
-      GRAPHRAG_LLM_MODEL: ${{ secrets.GRAPHRAG_LLM_MODEL }}
       GRAPHRAG_EMBEDDING_MODEL: ${{ secrets.GRAPHRAG_EMBEDDING_MODEL }}
-
+      GRAPHRAG_LLM_MODEL: ${{ secrets.GRAPHRAG_LLM_MODEL }}
+    if: github.event.pull_request.draft == false
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: dorny/paths-filter@v3
-        id: changes
+      - name: Start Energy Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
         with:
-          filters: |
-            python:
-              - 'graphrag/**/*'
-              - 'poetry.lock'
-              - 'pyproject.toml'
-              - '**/*.py'
-              - '**/*.toml'
-              - '**/*.ipynb'
-              - '.github/workflows/python*.yml'
-
+          json-output: true
+          task: start-measurement
+      - uses: actions/checkout@v4
+      - id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: "python:\n  - 'graphrag/**/*'\n  - 'poetry.lock'\n  - 'pyproject.toml'\n\
+            \  - '**/*.py'\n  - '**/*.toml'\n  - '**/*.ipynb'\n  - '.github/workflows/python*.yml'\n"
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-
       - name: Install Poetry
         uses: abatilo/actions-poetry@v3.0.0
         with:
           poetry-version: $POETRY_VERSION
-
       - name: Install dependencies
-        shell: bash
-        run: |
-          poetry self add setuptools wheel
+        run: 'poetry self add setuptools wheel
+
           poetry run python -m pip install gensim
+
           poetry install
 
+          '
+        shell: bash
+      - id: measurement-6
+        name: Record Measurement After Install dependencies
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Install dependencies
+          task: get-measurement
       - name: Notebook Test
-        run: |
-          poetry run poe test_notebook
+        run: 'poetry run poe test_notebook
+
+          '
+      - id: measurement-8
+        name: Record Measurement After Notebook Test
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Notebook Test
+          task: get-measurement
+      - id: display-measurement
+        name: Display Energy Results
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: display-results
+      - name: Save Total Energy Consumption Data
+        run: echo '${{ steps.final-measurement.outputs.data-total-json }}' > total_energy_consumption.json
+      - name: Upload Energy Consumption Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: total-energy-consumption
+          path: total_energy_consumption.json
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+        python-version:
+          - '3.10'
+permissions:
+  contents: read
+  pull-requests: read

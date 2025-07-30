@@ -1,53 +1,85 @@
 name: gh-pages
 on:
   push:
-    branches: [main]
-permissions:
-  contents: write
+    branches:
+      - main
 
 env:
-  POETRY_VERSION: '1.8.3'
+  POETRY_VERSION: 1.8.3
   PYTHON_VERSION: '3.11'
-
 jobs:
   build:
-    runs-on: ubuntu-latest
     env:
-      GH_PAGES: 1
       DEBUG: 1
+      GH_PAGES: 1
       GRAPHRAG_API_KEY: ${{ secrets.GRAPHRAG_API_KEY }}
-      GRAPHRAG_LLM_MODEL: ${{ secrets.GRAPHRAG_LLM_MODEL }}
       GRAPHRAG_EMBEDDING_MODEL: ${{ secrets.GRAPHRAG_EMBEDDING_MODEL }}
-
+      GRAPHRAG_LLM_MODEL: ${{ secrets.GRAPHRAG_LLM_MODEL }}
+    runs-on: ubuntu-latest
     steps:
+      - name: Start Energy Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: start-measurement
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-
       - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-
       - name: Install Poetry ${{ env.POETRY_VERSION }}
         uses: abatilo/actions-poetry@v3.0.0
         with:
           poetry-version: ${{ env.POETRY_VERSION }}
-
       - name: poetry intsall
-        shell: bash
         run: poetry install
-  
-      - name: mkdocs build
         shell: bash
+      - id: measurement-5
+        name: Record Measurement After poetry intsall
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: poetry intsall
+          task: get-measurement
+      - name: mkdocs build
         run: poetry run poe build_docs
-
+        shell: bash
+      - id: measurement-7
+        name: Record Measurement After mkdocs build
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: mkdocs build
+          task: get-measurement
       - name: List Docsite Contents
         run: find site
-
+      - id: measurement-9
+        name: Record Measurement After List Docsite Contents
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: List Docsite Contents
+          task: get-measurement
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4.6.4
         with:
           branch: gh-pages
-          folder: site
           clean: true
+          folder: site
+      - id: display-measurement
+        name: Display Energy Results
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: display-results
+      - name: Save Total Energy Consumption Data
+        run: echo '${{ steps.final-measurement.outputs.data-total-json }}' > total_energy_consumption.json
+      - name: Upload Energy Consumption Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: total-energy-consumption
+          path: total_energy_consumption.json
+permissions:
+  contents: write
