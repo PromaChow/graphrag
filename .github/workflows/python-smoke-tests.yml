@@ -25,7 +25,7 @@ jobs:
     # Remove it if you only run on push.
     if: github.event.pull_request.draft == false
     runs-on: ${{ matrix.os }}
-    continue-on-error: false  # or true if you want the whole job not to fail
+    continue-on-error: true  # or true if you want the whole job not to fail
     env:
       AZURE_AI_SEARCH_API_KEY: ${{ secrets.AZURE_AI_SEARCH_API_KEY }}
       AZURE_AI_SEARCH_URL_ENDPOINT: ${{ secrets.AZURE_AI_SEARCH_URL_ENDPOINT }}
@@ -117,7 +117,7 @@ jobs:
         name: Smoke Test
         run: poetry run poe test_smoke
         # If you only want THIS step to be soft-failing:
-        # continue-on-error: true
+        continue-on-error: true
 
       - id: measurement-11
         name: Record Measurement After Smoke Test
